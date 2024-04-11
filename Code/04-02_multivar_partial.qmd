@@ -595,6 +595,7 @@ As expected, PCs were not multicollinear (VIF=1).
 # k-means
 
 k-means is an **unsupervised** clustering algorithm and partitions the data into k groups, where k is defined by the user.
+supervised v/s unsupervised - y variables are given in supervised classifcation: prediction of y variable using other x variable. 
 
 k-means works by
 
@@ -624,31 +625,46 @@ knitr::include_graphics("https://miro.medium.com/max/1400/1*oNt9G9UpVhtyFLDBwEMf
 
 ```
 
-k-means does not normalize our data for us like PCA did, so we will need to do that before running the model.
+k-means does not normalize our data for us like PCA did, so we will need to do that before running the model. If not done, weightage is given more to variables that have a large magnitude, irrespective of the units of the variables. 
 
 ```{r}
 # normalizing the data
-weather_norm  
+weather_norm  <- weather_n %>% 
+  mutate(across(everything(), ~scale(.x)))
 
 weather_norm
+summary(weather_norm)
 ```
+Scale does a normalization leading to means being zero, with unit standard deviations. 
+
 
 Also, we need to define the number of clusters we want.\
 Any thoughts?\
 Let's try 2.
 
 ```{r kmeans model }
-mod_km 
+mod_km <- kmeans(weather_norm,
+                 centers = 6,
+                 nstart = 10
+                 )
 
 mod_km
 ```
+nstart - no of times a full run must be done. 
+
 
 Since the choice of k can be subjective, we will need to find an objective way to select the value of k that most properly represents our dataset.
 
 ```{r choosing k - total error}
 # Total error x k
+factoextra::fviz_nbclust(weather_norm,
+                         method = "wss",
+                         k.max = 10,
+                         FUNcluster = kmeans)
 
 ```
+elbow method - optimum clusters at wherever the curve bends (like an elbow)
+
 
 ```{r choosing k - silhouette}
 # Silhouette width
@@ -658,14 +674,18 @@ fviz_nbclust(weather_norm,
              FUNcluster = kmeans) 
 
 ```
+average silhoutte width should be the highest 
 
-total error: k=3-4\
+total error: k=3 to 5 
 silhouette: k=4
 
 Let's go with 4 clusters.
 
 ```{r mod_km4 }
-mod_km4 
+mod_km4 <- kmeans(weather_norm,
+                  centers = 4,
+                  nstart = 10
+                  )
 
 mod_km4
 ```
@@ -673,7 +693,11 @@ mod_km4
 How many observations per cluster?
 
 ```{r}
-
+weather %>% 
+  mutate(cluster = mod_km4$cluster) %>% 
+  group_by(cluster) %>% 
+  tally()
+  
 ```
 
 Now how can we visually inspect the resutls of k-means?\
@@ -710,7 +734,9 @@ We could actually run ANOVA models for each original variable of the form
 and extract cluster mean and pairwise comparison to understand what variables had significant differences among clusters.
 
 ```{r kmeans PCA plot}
-
+fviz_cluster(mod_km4, 
+             data = weather_norm
+             )
 ```
 
 Notice how, behind the scenes, the fviz_cluster function ran a PCA and is showing us a plot with PCs 1 and 2 on the axis (same result as we obtained on the PCA analysis).
